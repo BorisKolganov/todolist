@@ -1,12 +1,18 @@
-from app import app, db
+from app import app, db, csrf
 from models import Work
-from flask import send_from_directory, jsonify, request
+from flask import send_from_directory, jsonify, request, render_template
 from datetime import datetime
 import time
 
+
+@app.before_request
+def check_csrf():
+    csrf.protect()
+
+
 @app.route('/')
 def index():
-    return app.send_static_file('index.html')
+    return render_template('index.html')
 
 @app.route('/js/<path:path>')
 def send_js(path):
@@ -19,6 +25,7 @@ def send_css(path):
 @app.route('/fonts/<path:path>')
 def send_font(path):
     return send_from_directory(app.static_folder + '/fonts', path)
+
 
 @app.route('/api/v1/getall')
 def getAll():
