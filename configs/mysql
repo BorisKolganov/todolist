@@ -1,0 +1,3 @@
+create database todo;
+create user 'todo'@'localhost' identified by 'todo';
+grant all privileges on todo.* to 'todo'@'localhost';
