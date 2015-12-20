@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+    <head>
+    <meta charset="utf-8">
+        <title>Hello, my friend</title>
+        <link rel="stylesheet" type="text/css" href="/css/bootstrap.min.css" />
+        <link rel="stylesheet" type="text/css" href="/css/datepicker.min.css" />
+        <script src="/js/jquery-2.1.4.min.js"></script>
+        <script src="/js/bootstrap.min.js"></script>
+        <script src="/js/moment.js"></script>
+        <script src="/js/datepicker.js"></script>
+        <script src="/js/underscore.js"></script>
+        <script src="/js/validator.js"></script>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+    </head>
+    <body>
+        <div class="container">
+            <div class="page-header">
+                <h1>Приветствую <small> перед Вами todo list</small></h1>
+            </div>
+            <div class="row"><div class="col-md-6 col-md-offset-3">
+                <form class="form-horizontal" data-toggle="validator" role="form">
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">Описание дела</label>
+                        <div class="col-sm-9">
+                            <input name="body" type="text" class="form-control" placeholder="Введите дело" data-error="you must die, i'm alone i'm best" required>
+                            <div class="help-block with-errors"></div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">Важность дела</label>
+                        <div class="col-sm-9">
+                            <select class="form-control" name="importance">
+                                <option value="so-so">Не очень важно</option>
+                                <option value="important">Важно</option>
+                                <option value="very important">Очень важно</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label">Дата выполнения</label>
+                        <div class="col-sm-9">
+                            <div class="input-group date">
+                                <input type="text" class="form-control" name="expired" placeholder="Выберите дату" data-error="If my calculations are correct, when this baby hits 88 miles per hour you're going to see some serious shit." required>
+                                <span class="input-group-addon">
+                                    <span class="glyphicon glyphicon-calendar"></span>
+                                </span>
+                            </div>
+                            <div class="help-block with-errors"></div>
+                        </div>
+                    </div>
+                    <div class="col-sm-9 col-sm-offset-3">
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-default work-submit">Добавить в список</button>
+                        </div>
+                    </div>
+                </form>
+            </div></div>
+            </br>
+            <table class="table table-striped table-hover">
+                <thead><tr>
+                    <th class="sortById">№</th>
+                    <th class="sortByBody">Описание</th>
+                    <th class="sortByImportance">Важность</th>
+                    <th class="sortByExpired">Срок</th>
+                    <th class="sortByDone">Выполнено</th>
+                    <th></th>
+                </tr></thead>
+            </table>
+        </div>
+
+        <script>
+            moment.locale('ru');
+            var map = {
+                "so-so":"Не очень важно",
+                "important":"Важно",
+                "very important":"Очень важно"
+            }
+            var tableRowTemplate = _.template("<tr class=\"<%= clazz %>\">\
+            <td><%= id %></td><td><%= body %></td><td><%= importance %></td><td><%= expired %></td>\
+            <td class=\"done\" data-id=\"<%= id %>\" ><%= done %> </td>\
+            <td class=\"delet\" data-id=\" <%= id %>\"> X </td>\
+            </tr>");
+            Array.prototype.remove = function(from, to) {
+                var rest = this.slice((to || from) + 1 || this.length);
+                this.length = from < 0 ? this.length + from : from;
+                return this.push.apply(this, rest);
+            };
+            $(document).ready(function() {
+                var sorter = undefined;
+                var Sorter = function(array) {
+                    this.array = array;
+                    this.lastSort = 'byId';
+                }
+                var table = $('.table');
+                var datepicker = $('.date').datetimepicker({locale: 'ru'});
+                var dataProcess = function(val) {
+                    var val = _.clone(val);
+                    var date = moment(val.expired);
+                    val.clazz = val.done?"success":date<moment()?"danger":"warning";
+                    val.importance = map[val.importance];
+                    val.done = val.done?"Сделано":"Предстоит сделать";
+                    val.expired = date.format('lll');
+                    table.append(tableRowTemplate(val));
+                    table.find('tbody>tr>td.done').last().click(function(event) {
+                        $.ajax({
+                            url: '/api/v1/trig',
+                            type: 'post',
+                            contentType: "application/json",
+                            data: JSON.stringify({id: $(this).data("id")}),
+                            context: this
+                        }).done(function(val) {
+                            var date = moment($(this).prev().html(), "lll");
+                            sorter.update($(this).data("id"), val.done);
+// TODO
+                            $(this).parent().removeClass().addClass(val.done?"success":date<moment()?"danger":"warning");
+                            $(this).text(val.done?"Сделано":"Предстоит сделать");
+                        })
+                    });
+                    table.find('tbody>tr>td.delet').last().click(function(event) {
+                        $.ajax({
+                            url: '/api/v1/delet',
+                            type: 'post',
+                            contentType: "application/json",
+                            data: JSON.stringify({id: $(this).data("id")}),
+                            context: this
+                        }).done(function(val) {
+                            sorter.remove($(this).data("id"));
+                            $(this).parent().remove();
+                        })
+                    });
+                }
+
+
+
+                Sorter.prototype.byId = function(type) {
+                    this.lastSort = 'byId';
+                    if (type == 'desc') {
+                        this.proccess(_.sortBy(this.array, 'id').reverse());
+                    } else {
+                        this.proccess(_.sortBy(this.array, 'id'));
+                    }
+                }
+
+                Sorter.prototype.update = function(id, done) {
+                    _.find(this.array, function (val) {
+                        return val.id == id;
+                    }).done = done;
+                    this[this.lastSort]();
+                }
+
+                Sorter.prototype.remove = function(id) {
+                    this.array.remove(_.findIndex(this.array, function(val) {
+                        return val.id == id;
+                    }));
+                }
+
+                Sorter.prototype.byBody = function() {
+                    this.lastSort = 'byBody'
+                    this.proccess(_.sortBy(this.array, 'body'));
+                }
+
+
+                Sorter.prototype.byImportance = function() {
+                    this.lastSort = 'byImportance'
+                    this.proccess(_.sortBy(this.array, function (val) {
+                        return val.importance=="very important"?1:val.importance=="important"?2:3;
+                    }));
+                }
+
+
+                Sorter.prototype.byExpired = function() {
+                    this.lastSort = 'byExpired'
+                    this.proccess(_.sortBy(this.array, function (val) {
+                        return moment(val.expired)
+                    }));
+                }
+
+                Sorter.prototype.byDone = function() {
+                    this.lastSort = 'byDone'
+                    this.proccess(_.sortBy(this.array, 'done'));
+                }
+
+                Sorter.prototype.append = function(val) {
+                    this.array.push(val);
+                    this[this.lastSort]();
+                }
+                Sorter.prototype.proccess = function(array) {
+                    $('.table').find('tbody').children().remove();
+                    _.each(array, function(val) {
+                        dataProcess(val);
+                    });
+                }
+
+
+
+                $('.sortById').click(function(e) {
+                    sorter.byId('desc');
+                })
+                $('.sortByBody').click(function(e) {
+                    sorter.byBody();
+                });
+                $('.sortByImportance').click(function(e) {
+                    sorter.byImportance();
+                });
+                $('.sortByExpired').click(function(e) {
+                    sorter.byExpired();
+                });
+                $('.sortByDone').click(function(e) {
+                    sorter.byDone();
+                })
+
+                $('.form-horizontal').validator().on('submit', function (event) {
+                    if (!event.isDefaultPrevented()) {
+                        event.preventDefault();
+                        var array = $(this).serializeArray();
+                        array[2].value = moment(array[2].value, 'DD.MM.YYYY HH:mm').unix();
+                        $.ajax({
+                            url: '/api/v1/work',
+                            type: 'post',
+                            contentType: 'application/json',
+                            data: JSON.stringify(_.reduce(array, function (sum, current) {
+                                sum[current.name] = current.value;
+                                return sum;
+                            }, {}))
+                        })
+                        .done(function(val) {
+                            sorter.append(val);
+                            $('.form-horizontal')[0].reset();
+                        });
+                    }
+                })
+                $.ajax({
+                    url: '/api/v1/getall',
+                    type: 'get',
+                }).done(function(val) {
+                    sorter = new Sorter(val.result);
+                    sorter.byId();
+                });
+            });
+        </script>
+    </body>
+</html>
