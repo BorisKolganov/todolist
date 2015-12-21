@@ -80,14 +80,15 @@
                 <td><%= importance %></td>\
                 <td><%= expired %></td>\
                 <td class=\"done\" data-id=\"<%= id %>\"><%= done %></td>\
-                <td class=\"delet\" data-id=\"<%= id %>\">X</td>");
+                <td class=\"delet\" data-id=\"<%= id %>\"><span class=\"glyphicon glyphicon-trash\" aria-hidden=\"true\"></span></td>");
 
             var RowModel = Backbone.Model.extend({
                 toJSON: function() {
                     return {
                         id: this.get('id'),
                         body: _.escape(this.get('body')),
-                        done: this.get('done')?"Сделано":"Предстоит сделать",
+                        done: this.get('done')?"Сделано <span class=\"glyphicon glyphicon-ok\" aria-hidden=\"true\"></span>"
+                        :"Предстоит сделать <span class=\"glyphicon glyphicon-remove\" aria-hidden=\"true\"></span>",
                         expired: moment(this.get('expired')).format('lll'),
                         importance: map[this.get('importance')],
                     }
@@ -129,6 +130,7 @@
                             }
                         }).done(function(val){
                             this.set(val);
+                            // this.collection.sort();
                             // this.collection.trigger('add');
                         })
                     }
@@ -148,11 +150,12 @@
                             context: this
                         }).done(function(data) {
                             this.add(data.result);
+                            this.sort();
                         })
                     }
                 },
                 comparator: function (model) {
-                    return model.get('id');
+                    return -moment(model.get('expired'));
                 }
             })
 
@@ -186,7 +189,7 @@
                 className: "table table-striped table-hover",
                 template: tableTemplate,
                 initialize: function() {
-                    this.sort = {type: 'sortById', asc: true}
+                    this.sort = {type: 'sortByExpired', asc: false}
                     this.collection.fetch();
                     this.listenTo(this.collection, 'add', this.render);
                     this.listenTo(this.collection, 'sort', this.render);
